@@ -3,64 +3,102 @@
 #include <vector>
 #include <iostream>
 #include <random>
-
 using namespace std;
 
 int main() {
-    // rm test.db
+    // ⚠️ Borra si quieres empezar limpio
+    // system("rm -f test.db");
 
     Disk disk("test.db");
     BPlusTree<int> tree(disk);
 
-    const int N = 1000;
-
-    // ================= INSERT RANDOM =================
-    vector<int> nums;
-    for (int i = 1; i <= N; i++) nums.push_back(i);
+    const int INSERTS = 1000;
+    const int MAX_KEY = 10000;
 
     random_device rd;
-    mt19937 g(rd());
-    shuffle(nums.begin(), nums.end(), g);
+    mt19937 gen(rd());
+    uniform_int_distribution<> dist(1, MAX_KEY);
 
-    for (int x : nums) {
-        tree.insert(x, {x, 0});
+    // ================= INSERT RANDOM DUPLICATES =================
+    disk.resetCounters();
+
+    for (int i = 0; i < INSERTS; i++) {
+        int key = dist(gen);
+
+        // RID único (simulado)
+        RID rid = {key, i};  
+        tree.insert(key, rid);
     }
 
-    cout << "Insercion random completada\n";
+    cout << "Insercion random (con duplicados) completada\n";
+    cout << "Accesos a disco (insert): " 
+         << disk.totalAccesses() << "\n\n";
 
-    // ================= SEARCH CHECK =================
-    bool ok = true;
-    for (int i = 1; i <= N; i++) {
-        RID r = tree.search(i);
-        if (isNullRID(r)) {
-            cout << "❌ Error en key: " << i << endl;
-            ok = false;
-            break;
+
+    // ================= SEARCH RANDOM TEST =================
+    disk.resetCounters();
+
+    cout << "Busqueda de claves random:\n";
+    for (int i = 0; i < 10; i++) {
+        int key = dist(gen);
+
+        auto results = tree.searchAll(key);
+
+        cout << "Key " << key << " -> encontrados: " 
+             << results.size() << endl;
+
+        for (auto &r : results) {
+            cout << "(" << r.page_id << "," << r.slot << ") ";
         }
+        cout << "\n";
     }
 
-    if (ok) cout << "✅ Busqueda OK\n";
+    cout << "\nAccesos a disco (search): "
+         << disk.totalAccesses() << "\n\n";
+
 
     // ================= RANGE TEST =================
-    int a = 400, b = 420;
-    auto res = tree.rangeSearch(a, b);
+    disk.resetCounters();
 
-    cout << "Range [" << a << "," << b << "]: ";
-    for (auto &r : res) {
-        cout << r.page_id << " ";
+    int a = 100, b = 200;
+    auto range = tree.rangeSearch(a, b);
+
+    cout << "Range [" << a << "," << b << "]\n";
+    cout << "Cantidad obtenida: " << range.size() << "\n";
+
+    cout << "Primeros 20 resultados:\n";
+    for (int i = 0; i < min(20, (int)range.size()); i++) {
+        cout << "(" << range[i].page_id << "," 
+             << range[i].slot << ") ";
     }
-    cout << endl;
+    cout << "\n";
 
-    // ================= DUPLICADOS =================
-    cout << "\nTest duplicados:\n";
-    tree.insert(500, {999,1});
-    tree.insert(500, {999,2});
+    cout << "Accesos a disco (range): "
+         << disk.totalAccesses() << "\n\n";
 
-    auto dup = tree.searchAll(500);
-    cout << "Cantidad de 500s: " << dup.size() << endl;
 
-    // ================= DEBUG =================
-    cout << "\nEstructura de hojas:\n";
+    // ================= RANGE GRANDE =================
+    auto bigRange = tree.rangeSearch(1, 10000);
+    cout << "Range total size: " << bigRange.size() << endl;
+    cout << "Esperado aprox: " << INSERTS << "\n\n";
+
+
+    // ================= TEST DUPLICADOS =================
+    int testKey = dist(gen);
+
+    auto dups = tree.searchAll(testKey);
+
+    cout << "Test duplicados clave " << testKey << ":\n";
+    cout << "Cantidad: " << dups.size() << "\n";
+
+    for (auto &r : dups) {
+        cout << "(" << r.page_id << "," << r.slot << ") ";
+    }
+    cout << "\n\n";
+
+
+    // ================= PRINT =================
+    cout << "Estructura de hojas:\n";
     tree.printLeaves();
 
     return 0;

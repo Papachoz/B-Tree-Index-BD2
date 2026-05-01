@@ -1,104 +1,73 @@
 #include "BTree.h"
-#include <algorithm>
-#include <vector>
 #include <iostream>
-#include <random>
+#include <vector>
+#include <cassert>
 using namespace std;
 
 int main() {
-    // ⚠️ Borra si quieres empezar limpio
-    // system("rm -f test.db");
+    // ⚠️ borra test.db antes de correr si quieres empezar limpio
+    // system("rm test.db");
 
     Disk disk("test.db");
-    BPlusTree<int> tree(disk);
+    BPlusTree<char> tree(disk);
 
-    const int INSERTS = 1000;
-    const int MAX_KEY = 10000;
+    cout << "===== INSERTANDO DATOS =====\n";
 
-    random_device rd;
-    mt19937 gen(rd());
-    uniform_int_distribution<> dist(1, MAX_KEY);
-
-    // ================= INSERT RANDOM DUPLICATES =================
-    disk.resetCounters();
-
-    for (int i = 0; i < INSERTS; i++) {
-        int key = dist(gen);
-
-        // RID único (simulado)
-        RID rid = {key, i};  
-        tree.insert(key, rid);
+    // 🔥 insertar duplicados: 'A'
+    for (int i = 0; i < 1000; i++) {
+        tree.insert('A', {i, i});
     }
 
-    cout << "Insercion random (con duplicados) completada\n";
-    cout << "Accesos a disco (insert): " 
-         << disk.totalAccesses() << "\n\n";
-
-
-    // ================= SEARCH RANDOM TEST =================
-    disk.resetCounters();
-
-    cout << "Busqueda de claves random:\n";
-    for (int i = 0; i < 10; i++) {
-        int key = dist(gen);
-
-        auto results = tree.searchAll(key);
-
-        cout << "Key " << key << " -> encontrados: " 
-             << results.size() << endl;
-
-        for (auto &r : results) {
-            cout << "(" << r.page_id << "," << r.slot << ") ";
-        }
-        cout << "\n";
+    // 🔥 insertar duplicados: 'B'
+    for (int i = 0; i < 200; i++) {
+        tree.insert('B', {i, i});
     }
 
-    cout << "\nAccesos a disco (search): "
-         << disk.totalAccesses() << "\n\n";
+    tree.printLeaves();
 
+    // ================= SEARCH NORMAL =================
+    cout << "\n===== SEARCH NORMAL =====\n";
+    RID r = tree.search('A');
 
-    // ================= RANGE TEST =================
-    disk.resetCounters();
-
-    int a = 100, b = 200;
-    auto range = tree.rangeSearch(a, b);
-
-    cout << "Range [" << a << "," << b << "]\n";
-    cout << "Cantidad obtenida: " << range.size() << "\n";
-
-    cout << "Primeros 20 resultados:\n";
-    for (int i = 0; i < min(20, (int)range.size()); i++) {
-        cout << "(" << range[i].page_id << "," 
-             << range[i].slot << ") ";
+    if (!isNullRID(r)) {
+        cout << "Encontrado A -> (" << r.page_id << ", " << r.slot << ")\n";
+    } else {
+        cout << "No encontrado A\n";
     }
-    cout << "\n";
 
-    cout << "Accesos a disco (range): "
-         << disk.totalAccesses() << "\n\n";
+    // ================= SEARCH ALL =================
+    cout << "\n===== SEARCH ALL (A) =====\n";
+    vector<RID> allA = tree.searchAll('A');
+    cout << "Total encontrados (A): " << allA.size() << "\n";
 
+    allA = tree.searchAll('B');
+    cout << "Total encontrados (B): " << allA.size() << "\n";
 
-    // ================= RANGE GRANDE =================
-    auto bigRange = tree.rangeSearch(1, 10000);
-    cout << "Range total size: " << bigRange.size() << endl;
-    cout << "Esperado aprox: " << INSERTS << "\n\n";
+    // ================= DELETE =================
+    cout << "\n===== ELIMINANDO key = A =====\n";
 
+    int before = tree.searchAll('A').size();
+    cout << "Antes: " << before << "\n";
 
-    // ================= TEST DUPLICADOS =================
-    int testKey = dist(gen);
+    tree.remove('A');
+    tree.remove('B');
 
-    auto dups = tree.searchAll(testKey);
+    int after = tree.searchAll('A').size();
+    cout << "Despues: " << after << "\n";
 
-    cout << "Test duplicados clave " << testKey << ":\n";
-    cout << "Cantidad: " << dups.size() << "\n";
+    before = tree.searchAll('B').size();
+    cout << "Antes: " << before << "\n";
 
-    for (auto &r : dups) {
-        cout << "(" << r.page_id << "," << r.slot << ") ";
-    }
-    cout << "\n\n";
+    tree.printLeaves();
 
+    // ================= VALIDACIÓN =================
+    cout << "\n===== VALIDACIONES =====\n";
 
-    // ================= PRINT =================
-    cout << "Estructura de hojas:\n";
+    assert(after == 0);
+    cout << "Eliminacion correcta\n";
+
+    cout << "\n===== FIN =====\n";
+
     tree.printLeaves();
 
     return 0;
